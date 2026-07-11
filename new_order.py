@@ -138,10 +138,9 @@ def getOrderCodes(flag='紫色'):
     orders = sorted(orders.items(), key=lambda x: x[1])  # 根据日期排序
     return [i[0] for i in orders]
 
-def getOrderDetail(orderCode, productMany=False, isWrite=False):
+def getOrderDetail(orderCode, isWrite=False):
     """
     获取指定订单的订单详情
-    productMany是否返回多个productCode
     isWrite是否进行订单信息写入
     返回：[{'title': '', 'product': '', 'color_id': '', 'color': '', 'size': '', 'quantity': '', 'addr': ''}, {}]
     """
@@ -563,7 +562,7 @@ def deleteSpecialProduct(uniqloOrderCode, productCode='486121'):
     Playwright_.input('//textarea', '拍错了')
     Playwright_.click('//button[text()="提交申请"]')
 
-def main(controller, devive_ip, productMany, isShip):
+def main(controller, devive_ip, resultMany, isShip):
     """start首次运行为False，后续为True"""
     now = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     content = now + '电商订单自动下单'
@@ -589,7 +588,7 @@ def main(controller, devive_ip, productMany, isShip):
     logger.info('获取千牛每个订单详情....')
     for orderCode in orderCodes:
         # 获取订单信息
-        orderInfo = getOrderDetail(orderCode, productMany, isWrite=True)
+        orderInfo = getOrderDetail(orderCode, isWrite=True)
         logger.info(f'开始处理{orderCode}订单：{[i["productTitle"] for i in orderInfo]}')
         if not orderInfo:
             logger.info(f'{orderCode}无匹配订单数据，无需处理')
@@ -617,12 +616,16 @@ def main(controller, devive_ip, productMany, isShip):
             colorCode = subOrder['colorCode']
             addr = subOrder['quantity']
             productCodes = subOrder['productCodes']
+            if len(productCodes) > 1:
+                logger.info(f'{fullTitle}\t\t存在多个{productCodes}')
 
             # 多个productCode
             validProduct = False
+
             for productCode in productCodes:
                 # 多个uniqloCode
-                uniqloCodes = getUniqloCodes(productCode, colorCode, color, match=True)
+                logger.info(f'开始处理：{productCode}')
+                uniqloCodes = getUniqloCodes(productCode, colorCode, color, match=resultMany)
                 for uniqloCode in uniqloCodes:
                     # 获取uniqloSizeCode
                     uniqloSizeCode = getUniqloSizeCode(productCode, uniqloCode, colorCode, color, size)
@@ -637,7 +640,7 @@ def main(controller, devive_ip, productMany, isShip):
                     successSubOrder.append(subOrder)
                     validProduct = True
                     break
-                if validProduct:
+                if validProduct or not resultMany:
                     break
             if not validProduct:
                 logger.info(f'{fullTitle}\t\t无匹配商品，跳过子订单')
@@ -725,8 +728,8 @@ def pay(controller, device_ip, server='127.0.0.1', rotation=3):
 
 if __name__ == '__main__':
     isShip = input("请选择是否包邮（1是、0否）：")
-    productMany = input("请输入是否支持查询多个产品（1是、0否）：")
-    productMany = True if productMany == '1' else False
+    resultMany = input("请输入是否支持查询多个产品（1是、0否）：")
+    resultMany = True if resultMany == '1' else False
 
     number = int(get_config_value('login', 'number'))
     interval = int(get_config_value('login', 'interval'))
@@ -734,7 +737,7 @@ if __name__ == '__main__':
     controller, devive_ip = checkRobotStatus()
 
     for i in range(number):
-        main(controller, devive_ip, productMany, isShip)
+        main(controller, devive_ip, resultMany, isShip)
         logger.info(f'等待{interval}秒再次执行')
         keepTime = uniqloWalk() + uniqloWalk() + uniqloWalk()
         time.sleep(interval-keepTime)
