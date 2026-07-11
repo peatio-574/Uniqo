@@ -209,11 +209,11 @@ def getOrderDetail(orderCode, productMany=False, isWrite=False):
             continue
 
         # 商品编号
-        ProductCode = re.findall('\d{6}', productTitle)
-        if not ProductCode:
+        ProductCodes = re.findall('\d{6}', productTitle)
+        ProductCodes = list(set(ProductCodes))
+        if not ProductCodes:
             logger.info(f"{orderCode} {productTitle}   商品编号异常，暂不计入订单：{productTitle}")
             continue
-        ProductCode = ProductCode[0] if not productMany else ProductCode
 
         # 商品颜色编号
         colorEle = f'({subOrderEle})[{subOrderId}]//span[contains(text(),"颜色")]/../span[2]/span'
@@ -240,7 +240,7 @@ def getOrderDetail(orderCode, productMany=False, isWrite=False):
 
         subOrderInfo = {
             'productTitle': productTitle,
-            'ProductCode': ProductCode,
+            'ProductCodes': ProductCodes,
             'colorCode': colorCode,
             'color': color,
             'size': size,
@@ -563,7 +563,7 @@ def deleteSpecialProduct(uniqloOrderCode, productCode='486121'):
     Playwright_.input('//textarea', '拍错了')
     Playwright_.click('//button[text()="提交申请"]')
 
-def main(controller, devive_ip, isShip):
+def main(controller, devive_ip, productMany, isShip):
     """start首次运行为False，后续为True"""
     now = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     content = now + '电商订单自动下单'
@@ -589,7 +589,7 @@ def main(controller, devive_ip, isShip):
     logger.info('获取千牛每个订单详情....')
     for orderCode in orderCodes:
         # 获取订单信息
-        orderInfo = getOrderDetail(orderCode, isWrite=True)
+        orderInfo = getOrderDetail(orderCode, productMany, isWrite=True)
         logger.info(f'开始处理{orderCode}订单：{[i["productTitle"] for i in orderInfo]}')
         if not orderInfo:
             logger.info(f'{orderCode}无匹配订单数据，无需处理')
@@ -610,23 +610,27 @@ def main(controller, devive_ip, isShip):
         successSubOrder = []
         for subOrder in orderInfo:
             logger.info(f'开始处理子订单：{subOrder}')
-            productCode = subOrder['productCode']
             fullTitle = subOrder['fullTitle']
             size = subOrder['size']
             quantity = subOrder['quantity']
             color = subOrder['color']
             colorCode = subOrder['colorCode']
             addr = subOrder['quantity']
-            # 获取uniqloCode
-            uniqloCode = getUniqloCode(productCode, colorCode, color, match=True)
-            # 获取uniqloSizeCode
-            uniqloSizeCode = getUniqloSizeCode(productCode, uniqloCode, colorCode, color, size)
-            # 获取uniqloCount
-            uniqloCount = getuniqloCount(uniqloCode, uniqloSizeCode)
-            # 判断库存
-            if uniqloCount < quantity:
-                logger.info(f'{fullTitle}\t\t库存不足，千牛下单数量：{quantity}，优衣库库存：{uniqloCount}，跳过子订单')
-                continue
+            productCodes = subOrder['productCodes']
+
+            # 多个千牛商品编号
+            for productCode in productCodes:
+                # 获取uniqloCode
+                uniqloCode = getUniqloCode(productCode, colorCode, color, match=True)
+                # 获取uniqloSizeCode
+                uniqloSizeCode = getUniqloSizeCode(productCode, uniqloCode, colorCode, color, size)
+                # 获取uniqloCount
+                uniqloCount = getuniqloCount(uniqloCode, uniqloSizeCode)
+                # 判断库存
+                if uniqloCount < quantity:
+                    logger.info(f'{fullTitle}\t\t库存不足，千牛下单数量：{quantity}，优衣库库存：{uniqloCount}，跳过子订单')
+                    if not productMany:
+                        break
             # 添加地址
             if not IsAddAddr:
                 logger.info(f'开始添加快递地址：{addr}')
@@ -712,13 +716,16 @@ def pay(controller, device_ip, server='127.0.0.1', rotation=3):
 
 if __name__ == '__main__':
     isShip = input("请选择是否包邮（1是、0否）：")
+    productMany = input("请输入是否支持查询多个产品（1是、0否）：")
+    productMany = True if productMany == '1' else False
+
     number = int(get_config_value('login', 'number'))
     interval = int(get_config_value('login', 'interval'))
 
     controller, devive_ip = checkRobotStatus()
 
     for i in range(number):
-        main(controller, devive_ip, isShip)
+        main(controller, devive_ip, productMany, isShip)
         logger.info(f'等待{interval}秒再次执行')
         keepTime = uniqloWalk() + uniqloWalk() + uniqloWalk()
         time.sleep(interval-keepTime)
