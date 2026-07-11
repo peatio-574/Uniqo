@@ -257,7 +257,7 @@ def getOrderDetail(orderCode, productMany=False, isWrite=False):
             f.write(f'{tmpInfo}\n')
     return orderInfo
 
-def getUniqloCode(productCode, colorCode, color, match=True):
+def getUniqloCodes(productCode, colorCode, color, match=True):
     """
     根据千牛的productCode/color/colorCode获取优衣库对应uniqloCode
     match是否严格匹配商品货号productCode一致
@@ -618,26 +618,35 @@ def main(controller, devive_ip, productMany, isShip):
             addr = subOrder['quantity']
             productCodes = subOrder['productCodes']
 
-            # 多个千牛商品编号
+            # 多个productCode
+            validProduct = False
             for productCode in productCodes:
-                # 获取uniqloCode
-                uniqloCode = getUniqloCode(productCode, colorCode, color, match=True)
-                # 获取uniqloSizeCode
-                uniqloSizeCode = getUniqloSizeCode(productCode, uniqloCode, colorCode, color, size)
-                # 获取uniqloCount
-                uniqloCount = getuniqloCount(uniqloCode, uniqloSizeCode)
-                # 判断库存
-                if uniqloCount < quantity:
-                    logger.info(f'{fullTitle}\t\t库存不足，千牛下单数量：{quantity}，优衣库库存：{uniqloCount}，跳过子订单')
-                    if not productMany:
-                        break
+                # 多个uniqloCode
+                uniqloCodes = getUniqloCodes(productCode, colorCode, color, match=True)
+                for uniqloCode in uniqloCodes:
+                    # 获取uniqloSizeCode
+                    uniqloSizeCode = getUniqloSizeCode(productCode, uniqloCode, colorCode, color, size)
+                    # 获取uniqloCount
+                    uniqloCount = getuniqloCount(uniqloCode, uniqloSizeCode)
+                    # 判断库存
+                    if uniqloCount < quantity:
+                        logger.info(f'{fullTitle}\t\t库存不足，千牛下单数量：{quantity}，优衣库库存：{uniqloCount}，跳过子订单')
+                        continue
+                    # 添加购物车
+                    addToPurchase(uniqloCode, uniqloSizeCode, quantity)
+                    successSubOrder.append(subOrder)
+                    validProduct = True
+                    break
+                if validProduct:
+                    break
+            if not validProduct:
+                logger.info(f'{fullTitle}\t\t无匹配商品，跳过子订单')
+                continue
             # 添加地址
             if not IsAddAddr:
                 logger.info(f'开始添加快递地址：{addr}')
                 IsAddAddr = addAddr(addr)
-            # 添加购物车
-            addToPurchase(uniqloCode, uniqloSizeCode, quantity)
-            successSubOrder.append(subOrder)
+
         if not IsAddAddr:
             logger.info('添加快递地址失败，跳过订单')
             continue
