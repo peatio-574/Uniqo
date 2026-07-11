@@ -562,7 +562,7 @@ def deleteSpecialProduct(uniqloOrderCode, productCode='486121'):
     Playwright_.input('//textarea', '拍错了')
     Playwright_.click('//button[text()="提交申请"]')
 
-def main(controller, devive_ip, resultMany, isShip):
+def main(controller, deviceIp, resultMany, isShip):
     """start首次运行为False，后续为True"""
     now = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     content = now + '电商订单自动下单'
@@ -659,7 +659,7 @@ def main(controller, devive_ip, resultMany, isShip):
         uniqloSubmit()
         # 支付
         startTime = time.time()
-        status = pay(controller, devive_ip)
+        status = pay(controller, deviceIp)
         if not status:
             logger.error(f'{orderCode}订单支付失败！！！')
             continue
@@ -734,10 +734,10 @@ if __name__ == '__main__':
     number = int(get_config_value('login', 'number'))
     interval = int(get_config_value('login', 'interval'))
 
-    controller, devive_ip = checkRobotStatus()
+    controller, deviceIp = checkRobotStatus()
 
     for i in range(number):
-        main(controller, devive_ip, resultMany, isShip)
+        main(controller, deviceIp, resultMany, isShip)
         logger.info(f'等待{interval}秒再次执行')
         keepTime = uniqloWalk() + uniqloWalk() + uniqloWalk()
         time.sleep(interval-keepTime)
