@@ -336,6 +336,8 @@ def getUniqloSizeCode(productCode, uniqloCode, colorCode, color, size):
     for sku in info:
         if sku.get('enabledFlag') == 'N':  # 不可售
             continue
+        if productCode not in sku['name'] or uniqloCode != sku['productCode']:  # 商品编号不匹配
+            continue
         if f'{colorCode}{color}' in sku['styleText'].replace(' ', ''):  #  颜色匹配
             size = dealSize(size)
             if isinstance(size, str):  # 尺寸匹配 str
