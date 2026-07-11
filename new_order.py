@@ -1,7 +1,5 @@
 import sys
 from pathlib import Path
-
-# 把项目根目录 D:\robot 加入Python路径
 sys.path.append(str(Path(__file__).parent.parent))
 
 import json
@@ -701,7 +699,6 @@ def pay(controller, device_ip, server='127.0.0.1', rotation=3):
     return True
 
 if __name__ == '__main__':
-    os.system(".\python3.10\python.exe -m playwright install")
     isShip = input("请选择是否包邮（1是、0否）：")
     number = int(get_config_value('login', 'number'))
     interval = int(get_config_value('login', 'interval'))
@@ -711,6 +708,6 @@ if __name__ == '__main__':
     for i in range(number):
         main(controller, devive_ip, isShip)
         logger.info(f'等待{interval}秒再次执行')
-        stay_time = uniqloWalk() + uniqloWalk() + uniqloWalk()
-        time.sleep(interval-stay_time)
+        keepTime = uniqloWalk() + uniqloWalk() + uniqloWalk()
+        time.sleep(interval-keepTime)
 
