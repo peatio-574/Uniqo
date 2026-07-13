@@ -319,6 +319,7 @@ def getUniqloSizeCode(productCode, uniqloCode, colorCode, color, size):
     time.sleep(2)
     info = Playwright_.get_text('//pre')
     info = json.loads(info)['rows']
+    newSize = dealSize(size)
 
     for sku in info:
         if sku.get('enabledFlag') == 'N':  # 不可售
@@ -326,13 +327,12 @@ def getUniqloSizeCode(productCode, uniqloCode, colorCode, color, size):
         if productCode not in sku['name'] or uniqloCode != sku['productCode']:  # 商品编号不匹配
             continue
         if f'{colorCode}{color}' in sku['styleText'].replace(' ', ''):  #  颜色匹配
-            size = dealSize(size)
-            if isinstance(size, str):  # 尺寸匹配 str
-                if sku['size'].replace(' ', '') == size:
+            if isinstance(newSize, str):  # 尺寸匹配 str
+                if sku['size'].replace(' ', '') == newSize:
                     uniqloSizeCode = sku['productId']
                     return uniqloSizeCode
-            elif isinstance(size, list): # 尺寸匹配 list
-                if sku['size'].replace(' ', '') in size:
+            elif isinstance(newSize, list): # 尺寸匹配 list
+                if sku['size'].replace(' ', '') in newSize:
                     uniqloSizeCode = sku['productId']
                     return uniqloSizeCode
     return ''
