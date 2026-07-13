@@ -125,7 +125,7 @@ def getOrderCodes(flag='紫色'):
             if orderColors[flag] != colorSrc:  # 旗帜颜色不匹配
                 continue
 
-            orderDateEle = '//span[contains(@class,"sold_create-time")]'  # 订单日期
+            orderDateEle = f'{rowEle})[{rowId}]//span[contains(@class,"sold_create-time")]'  # 订单日期
             orderDate = Playwright_.get_text(orderDateEle)
             orderDate = re.findall(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}', orderDate)[0]
             orders[orderCode] = orderDate
@@ -135,8 +135,8 @@ def getOrderCodes(flag='紫色'):
         Playwright_.page.keyboard.press("End")  # 滚动
         Playwright_.click('//span[text()="下一页"]')  # 页码跳转
         time.sleep(5)
-    orders = sorted(orders.items(), key=lambda x: x[1])  # 根据日期排序
-    return [i[0] for i in orders]
+    realOrders = sorted(orders.items(), key=lambda x: x[1])  # 根据日期排序
+    return [i[0] for i in realOrders]
 
 def displayOrderInfo():
     """将千牛订单信息从隐藏状态改为显示状态"""
@@ -195,9 +195,9 @@ def getOrderDetail(orderCode, isWrite=False):
             continue
 
         # 商品编号
-        ProductCodes = re.findall(r'\d{6}', productTitle)
-        ProductCodes = list(set(ProductCodes))
-        if not ProductCodes:
+        productCodes = re.findall(r'\d{6}', productTitle)
+        productCodes = list(set(productCodes))
+        if not productCodes:
             logger.info(f"{orderCode} {productTitle}   商品编号异常，暂不计入订单：{productTitle}")
             continue
 
@@ -226,7 +226,7 @@ def getOrderDetail(orderCode, isWrite=False):
 
         subOrderInfo = {
             'productTitle': productTitle,
-            'ProductCodes': ProductCodes,
+            'productCodes': productCodes,
             'colorCode': colorCode,
             'color': color,
             'size': size,
@@ -670,12 +670,12 @@ def main(controller, deviceIp, resultMany, isShip):
 def getUniqloOrderCode(startTime, endTime):
     """根据时间戳，获取购买订单编号"""
     uniqloLogin()
-    start_time = startTime * 1000
-    end_time = endTime * 1000
+    startTime = startTime * 1000
+    endTime = endTime * 1000
     url = 'https://i.uniqlo.cn/p/hmall-od-service/order/queryForUserOrders/1/10/zh_CN'
     params = {}
     response = requests.post(url, headers=uniqloHeaders(flag=True), data=json.dumps(params)).json()['resp'][0]
-    if start_time <= response['creationTime'] <= end_time and response['status'] == 'WAIT_SHIP':
+    if startTime <= response['creationTime'] <= endTime and response['status'] == 'WAIT_SHIP':
         return response["orderId"]
     return None
 
