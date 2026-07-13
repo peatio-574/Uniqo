@@ -714,7 +714,8 @@ def pay(controller, device_ip, server='127.0.0.1', rotation=3):
     return True
 
 
-if __name__ == '__main__':
+def runRobot():
+    """运行机械臂下单"""
     isShip = input("请选择是否包邮（1是、0否）：")
     resultMany = input("请输入是否支持查询多个产品（1是、0否）：")
     resultMany = True if resultMany == '1' else False
@@ -728,5 +729,39 @@ if __name__ == '__main__':
         main(controller, deviceIp, resultMany, isShip)
         logger.info(f'等待{interval}秒再次执行')
         keepTime = uniqloWalk() + uniqloWalk() + uniqloWalk()
-        time.sleep(interval-keepTime)
+        time.sleep(interval - keepTime)
+
+def queryUniqloOrder():
+    """查询优衣库订单信息"""
+    pass
+
+def modifyOrderStatus():
+    """修改订单状态"""
+    pass
+
+def clearLoginInfo():
+    """清空当前登录信息"""
+    write_config_value('alibaba', {
+        'orderCookie': None,
+        'orderCookie_api': None,
+    })
+    write_config_value('uniqlo', {
+        'uniqloToken': None,
+        'uniqloCookie': None,
+        'uniqloCookieApi': None,
+    })
+
+if __name__ == '__main__':
+    step = input("请选择执行步骤（1.运行机械臂下单、2.查询优衣库订单信息、3.修改千牛旗帜颜色、4.清空当前登录信息）：")
+    if step == '1':
+        runRobot()
+    elif step == '2':
+        queryUniqloOrder()
+    elif step == '3':
+        modifyOrderStatus()
+    elif step == '4':
+        clearLoginInfo()
+    else:
+        logger.error('请输入正确的步骤')
+
 

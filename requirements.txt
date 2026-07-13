@@ -1,0 +1,5 @@
+requests
+screeninfo
+playwright
+pandas
+openpyxl
