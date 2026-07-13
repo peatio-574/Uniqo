@@ -189,10 +189,10 @@ def getOrderDetail(orderCode, isWrite=False):
         elif Playwright_.get_count(subOrderStatusEleTwo):
             subOrderStatus = Playwright_.get_text(subOrderStatusEleTwo)
         if '收货' in subOrderStatus:
-            logger.info(f"{orderCode} {productTitle}   已发货，暂不计入订单")
+            logger.info(f"{orderCode} {productTitle}   已发货，暂不计入订单\n")
             continue
         elif '退款' in subOrderStatus:
-            logger.info(f"{orderCode} {productTitle}   已退款，暂不计入订单")
+            logger.info(f"{orderCode} {productTitle}   已退款，暂不计入订单\n")
             continue
 
         # 商品编号
@@ -555,6 +555,67 @@ def deleteSpecialProduct(uniqloOrderCode, productCode='486121'):
     Playwright_.input('//textarea', '拍错了')
     Playwright_.click('//button[text()="提交申请"]')
 
+
+def executeSingleOrder(orderCode, isWrite=True):
+    """单次单个订单"""
+    orderInfo = getOrderDetail(orderCode, isWrite=isWrite)
+    logger.info(f'开始处理{orderCode}订单：{[i["productTitle"] for i in orderInfo]}')
+    if not orderInfo:
+        logger.info(f'{orderCode}无匹配订单数据，无需处理')
+        return None
+
+    # 清空购物车
+    logger.info('清空购物车....')
+    purchaseList = getPurchaseList()
+    detelePurchaseList(purchaseList)
+
+    # 删除地址
+    logger.info('删除快递地址....')
+    addrList = getAddrList()
+    for addrCode in addrList:
+        deleteAddr(addrCode)
+
+    successSubOrder = []
+    for subOrder in orderInfo:
+        logger.info(f'开始处理子订单：{subOrder}')
+        fullTitle = subOrder['fullTitle']
+        size = subOrder['size']
+        quantity = subOrder['quantity']
+        color = subOrder['color']
+        colorCode = subOrder['colorCode']
+        addr = subOrder['addr']
+        productCodes = subOrder['productCodes']
+        if len(productCodes) > 1:
+            logger.info(f'{fullTitle}\t\t存在多个{productCodes}')
+        currentSubOrder = []
+        for productCode in productCodes:
+            # 多个uniqloCode
+            logger.info(f'开始处理：{productCode}')
+            uniqloCodes = getUniqloCodes(productCode, colorCode, color, match=resultMany)
+            logger.info(f'千牛商品编号：{productCode}匹配的优衣库商品编号：{uniqloCodes}')
+            for uniqloCode in uniqloCodes:
+                # 获取uniqloSizeCode
+                uniqloSizeCode = getUniqloSizeCode(productCode, uniqloCode, colorCode, color, size)
+                logger.info(
+                    f'千牛商品编号：{productCode}、优衣库商品编号：{uniqloCode}匹配的优衣库商品尺寸编号：{uniqloSizeCode}')
+                # 获取uniqloCount
+                uniqloCount = getuniqloCount(uniqloCode, uniqloSizeCode)
+                logger.info(f'颜色编号：{colorCode}、颜色：{color}、尺寸：{size}匹配的优衣库商品库存：{uniqloCount}')
+                # 判断库存
+                if uniqloCount < quantity:
+                    logger.info(f'{fullTitle}\t\t库存不足，千牛下单数量：{quantity}，优衣库库存：{uniqloCount}，跳过子订单')
+                    continue
+                # 添加购物车
+                addToPurchase(uniqloCode, uniqloSizeCode, quantity)
+                logger.info(f'{productCode}添加购物车成功')
+                successSubOrder.append(subOrder)
+                currentSubOrder.append(productCode)
+                break
+            if not resultMany or currentSubOrder:
+                break
+    return successSubOrder
+
+
 def onceRunRobot(controller, deviceIp, resultMany, isShip):
     """start首次运行为False，后续为True"""
     now = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
@@ -580,75 +641,19 @@ def onceRunRobot(controller, deviceIp, resultMany, isShip):
 
     logger.info('获取千牛每个订单详情....')
     for orderCode in orderCodes:
-        # 获取订单信息
-        orderInfo = getOrderDetail(orderCode, isWrite=True)
-        logger.info(f'开始处理{orderCode}订单：{[i["productTitle"] for i in orderInfo]}')
-        if not orderInfo:
-            logger.info(f'{orderCode}无匹配订单数据，无需处理')
+        # 执行单个订单
+        successSubOrder = executeSingleOrder(orderCode, isWrite=True)
+
+        if not successSubOrder:
+            logger.info(f'{orderCode}无匹配订单数据，跳过该订单')
             continue
 
-        # 清空购物车
-        logger.info('清空购物车....')
-        purchaseList = getPurchaseList()
-        detelePurchaseList(purchaseList)
+        # 添加地址
+        logger.info(f'开始添加快递地址：{addr}')
+        isAddAddr = addAddr(addr)
 
-        # 删除地址
-        logger.info('删除快递地址....')
-        addrList = getAddrList()
-        for addrCode in addrList:
-            deleteAddr(addrCode)
-
-        IsAddAddr = False
-        successSubOrder = []
-        for subOrder in orderInfo:
-            logger.info(f'开始处理子订单：{subOrder}')
-            fullTitle = subOrder['fullTitle']
-            size = subOrder['size']
-            quantity = subOrder['quantity']
-            color = subOrder['color']
-            colorCode = subOrder['colorCode']
-            addr = subOrder['addr']
-            productCodes = subOrder['productCodes']
-            if len(productCodes) > 1:
-                logger.info(f'{fullTitle}\t\t存在多个{productCodes}')
-
-            # 多个productCode
-            validProduct = False
-
-            for productCode in productCodes:
-                # 多个uniqloCode
-                logger.info(f'开始处理：{productCode}')
-                uniqloCodes = getUniqloCodes(productCode, colorCode, color, match=resultMany)
-                logger.info(f'千牛商品编号：{productCode}匹配的优衣库商品编号：{uniqloCodes}')
-                for uniqloCode in uniqloCodes:
-                    # 获取uniqloSizeCode
-                    uniqloSizeCode = getUniqloSizeCode(productCode, uniqloCode, colorCode, color, size)
-                    logger.info(f'千牛商品编号：{productCode}、优衣库商品编号：{uniqloCode}匹配的优衣库商品尺寸编号：{uniqloSizeCode}')
-                    # 获取uniqloCount
-                    uniqloCount = getuniqloCount(uniqloCode, uniqloSizeCode)
-                    logger.info(f'颜色编号：{colorCode}、颜色：{color}、尺寸：{size}匹配的优衣库商品库存：{uniqloCount}')
-                    # 判断库存
-                    if uniqloCount < quantity:
-                        logger.info(f'{fullTitle}\t\t库存不足，千牛下单数量：{quantity}，优衣库库存：{uniqloCount}，跳过子订单')
-                        continue
-                    # 添加购物车
-                    addToPurchase(uniqloCode, uniqloSizeCode, quantity)
-                    logger.info(f'{productCode}添加购物车成功')
-                    successSubOrder.append(subOrder)
-                    validProduct = True
-                    break
-                if validProduct or not resultMany:
-                    break
-            if not validProduct:
-                logger.info(f'{fullTitle}\t\t无匹配商品，跳过子订单')
-                continue
-            # 添加地址
-            if not IsAddAddr:
-                logger.info(f'开始添加快递地址：{addr}')
-                IsAddAddr = addAddr(addr)
-
-        if not IsAddAddr:
-            logger.info('添加快递地址失败，跳过订单')
+        if not isAddAddr:
+            logger.info(f'{orderCode}添加快递地址失败，跳过该订单')
             continue
 
         if isShip == '0':
