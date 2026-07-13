@@ -125,7 +125,7 @@ def getOrderCodes(flag='紫色'):
             if orderColors[flag] != colorSrc:  # 旗帜颜色不匹配
                 continue
 
-            orderDateEle = f'{rowEle})[{rowId}]//span[contains(@class,"sold_create-time")]'  # 订单日期
+            orderDateEle = f'({rowEle})[{rowId}]//span[contains(@class,"sold_create-time")]'  # 订单日期
             orderDate = Playwright_.get_text(orderDateEle)
             orderDate = re.findall(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}', orderDate)[0]
             orders[orderCode] = orderDate
@@ -136,7 +136,8 @@ def getOrderCodes(flag='紫色'):
         Playwright_.click('//span[text()="下一页"]')  # 页码跳转
         time.sleep(5)
     realOrders = sorted(orders.items(), key=lambda x: x[1])  # 根据日期排序
-    return [i[0] for i in realOrders]
+    orderCodes = [i[0] for i in realOrders]
+    return orderCodes
 
 def displayOrderInfo():
     """将千牛订单信息从隐藏状态改为显示状态"""
@@ -210,7 +211,7 @@ def getOrderDetail(orderCode, isWrite=False):
             continue
         colorCode = colorCode[0]
         # 商品颜色
-        color = re.findall(r'[\u4e00-\u9fa5]', colorString)[0]
+        color = re.findall(r'[\u4e00-\u9fa5]+', colorString)[0]
 
         # 商品尺寸
         sizeEle = f'({subOrderEle})[{subOrderId}]//span[contains(text(),"尺")]/../span[2]/span'
@@ -368,8 +369,9 @@ def getuniqloCount(uniqloCode, uniqloSizeCode):
         "type": "DETAIL"
     }
     info = requests.post(url3, headers=baseHeaders, data=json.dumps(params)).json()
-    product_count = info['resp'][0]['skuStocks'].get(uniqloSizeCode)
-    return int(product_count)
+    uniqloCount = info['resp'][0]['skuStocks'].get(uniqloSizeCode)
+    uniqloCount = int(uniqloCount)
+    return uniqloCount
 
 def uniqloHeaders(flag=False):
     """优衣库接口headers"""
@@ -524,11 +526,14 @@ def modifyOrderStatus(orderCode, text=None):
 
 def clear():
     """清除cookie"""
-    write_config_value('alibaba', {'orderCookie': ''})
-    write_config_value('uniqlo', {'uniqloCookie': '', 'uniqloCookieApi': '', 'uniqloToken': ''})
+    logger.info('开始清除千牛登录信息')
+    write_config_value('alibaba', {'orderCookie': ''}, file=config_file)
+    logger.info('开始清除优衣库登录信息')
+    write_config_value('uniqlo', {'uniqloCookie': '', 'uniqloCookieApi': '', 'uniqloToken': ''}, file=config_file)
+    logger.info('清除登录信息成功')
 
 def uniqloSubmit():
-    """提交订单"""
+    """优衣库提交订单"""
     Playwright_.goto('https://www.uniqlo.cn/cart.html')
     time.sleep(3)
     Playwright_.click('//button[text()="立即结算"]')
@@ -539,6 +544,7 @@ def addSpecialProduct(uniqloCode='u0000000074588', uniqloSizeCode='u000000007458
     addToPurchase(uniqloCode, uniqloSizeCode, quantity)
 
 def deleteSpecialProduct(uniqloOrderCode, productCode='486121'):
+    """删除优衣库凑单商品"""
     list_url = 'https://www.uniqlo.cn/account/order/order_list.html'
     Playwright_.goto(list_url)
     time.sleep(3)
@@ -549,7 +555,7 @@ def deleteSpecialProduct(uniqloOrderCode, productCode='486121'):
     Playwright_.input('//textarea', '拍错了')
     Playwright_.click('//button[text()="提交申请"]')
 
-def main(controller, deviceIp, resultMany, isShip):
+def onceRunRobot(controller, deviceIp, resultMany, isShip):
     """start首次运行为False，后续为True"""
     now = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     content = now + '电商订单自动下单'
@@ -613,17 +619,21 @@ def main(controller, deviceIp, resultMany, isShip):
                 # 多个uniqloCode
                 logger.info(f'开始处理：{productCode}')
                 uniqloCodes = getUniqloCodes(productCode, colorCode, color, match=resultMany)
+                logger.info(f'千牛商品编号：{productCode}匹配的优衣库商品编号：{uniqloCodes}')
                 for uniqloCode in uniqloCodes:
                     # 获取uniqloSizeCode
                     uniqloSizeCode = getUniqloSizeCode(productCode, uniqloCode, colorCode, color, size)
+                    logger.info(f'千牛商品编号：{productCode}、优衣库商品编号：{uniqloCode}匹配的优衣库商品尺寸编号：{uniqloSizeCode}')
                     # 获取uniqloCount
                     uniqloCount = getuniqloCount(uniqloCode, uniqloSizeCode)
+                    logger.info(f'颜色编号：{colorCode}、颜色：{color}、尺寸：{size}匹配的优衣库商品库存：{uniqloCount}')
                     # 判断库存
                     if uniqloCount < quantity:
                         logger.info(f'{fullTitle}\t\t库存不足，千牛下单数量：{quantity}，优衣库库存：{uniqloCount}，跳过子订单')
                         continue
                     # 添加购物车
                     addToPurchase(uniqloCode, uniqloSizeCode, quantity)
+                    logger.info(f'{productCode}添加购物车成功')
                     successSubOrder.append(subOrder)
                     validProduct = True
                     break
@@ -643,6 +653,7 @@ def main(controller, deviceIp, resultMany, isShip):
 
         if isShip == '0':
             addSpecialProduct()
+            logger.info('凑单商品添加购物车成功')
         uniqloSubmit()
         # 支付
         startTime = time.time()
@@ -668,7 +679,7 @@ def main(controller, deviceIp, resultMany, isShip):
     return True
 
 def getUniqloOrderCode(startTime, endTime):
-    """根据时间戳，获取购买订单编号"""
+    """根据时间戳，获取优衣库购买订单编号"""
     uniqloLogin()
     startTime = startTime * 1000
     endTime = endTime * 1000
@@ -713,7 +724,6 @@ def pay(controller, device_ip, server='127.0.0.1', rotation=3):
     controller.ocr_text_and_click(server, device_ip, rotation, '完成', home=False)
     return True
 
-
 def runRobot():
     """运行机械臂下单"""
     isShip = input("请选择是否包邮（1是、0否）：")
@@ -726,7 +736,7 @@ def runRobot():
     controller, deviceIp = checkRobotStatus()
 
     for i in range(number):
-        main(controller, deviceIp, resultMany, isShip)
+        onceRunRobot(controller, deviceIp, resultMany, isShip)
         logger.info(f'等待{interval}秒再次执行')
         keepTime = uniqloWalk() + uniqloWalk() + uniqloWalk()
         time.sleep(interval - keepTime)
@@ -742,19 +752,19 @@ class WangDianTong(object):
     appsecret = '83819b55d08037ffcace863a0d5fcd71'
 
     @classmethod
-    def get_params(cls, data):
+    def getParams(cls, data):
         """根据请求参数获取算法sign，返回整个公共params，后续在请求时公共params使用params传递，请求参数使用data传递"""
         info = {
             "sid": cls.sid,
             "appkey": cls.appkey,
             "timestamp": int(time.time()),
         }
-        tmp_params = copy.deepcopy(info)
+        tmpParams = copy.deepcopy(info)
         for k, v in data.items():
-            tmp_params[k] = v
-        tmp_params = dict(sorted(tmp_params.items()))
+            tmpParams[k] = v
+        tmpParams = dict(sorted(tmpParams.items()))
         string = str()
-        for k, v in tmp_params.items():
+        for k, v in tmpParams.items():
             k_len = '0' + str(len(k.encode('utf8')))
             k_ = k_len[-2:]
             v_len = '000' + str(len(str(v).encode('utf8')))
@@ -762,53 +772,53 @@ class WangDianTong(object):
             string += f'{k_}-{k}:{v_}-{v};'
         result = string[:-1] + cls.appsecret
 
-        md5_obj = hashlib.md5()
-        md5_obj.update(result.encode('utf8'))
-        sign = md5_obj.hexdigest()
+        md5Obj = hashlib.md5()
+        md5Obj.update(result.encode('utf8'))
+        sign = md5Obj.hexdigest()
         info["sign"] = sign
         return info
     
     @classmethod
-    def get_shop_code(cls, productCode, size, color):
+    def getShopCode(cls, productCode, size, color):
         """根据千牛的商品编号获取商家编码"""
         url = 'https://api.wangdian.cn/openapi2/goods_query.php'
 
         now = time.time()
-        end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now - 0 * 24 * 60 * 60))
-        start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now - 30 * 24 * 60 * 60))
+        endTime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now - 0 * 24 * 60 * 60))
+        startTime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now - 30 * 24 * 60 * 60))
         data = {
-            'start_time': start_time,
-            'end_time': end_time,
+            'startTime': startTime,
+            'endTime': endTime,
             'page_no': 0,
             'page_size': 100,
             "warehouse_no": 3,
             "goods_no": productCode,  # 千牛订单的productCode即为goods_no
         }
-        params = get_params(data)
+        params = getParams(data)
         response = requests.post(url, params=params, data=data).json()['goods_list']
         if len(response) == 0:
             return None
         for item in response[0]['spec_list']:
             if item['spec_code'] == size and re.findall(r'[\u4e00-\u9fa5]+', item['spec_name'])[0] == color:
-                return item['specNo']
+                return item['specNo']  # 商家编号
         return None
     
     @classmethod
-    def get_stock(cls, specNo):
+    def getStock(cls, specNo):
         """根据货品编号获取库存"""
         url = 'https://api.wangdian.cn/openapi2/stock_query_detail.php'
         now = time.time()
-        start_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now - 30 * 24 * 60 * 60))
-        end_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(now))
+        startTime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(now - 30 * 24 * 60 * 60))
+        endTime = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(now))
         data = {
-            'start_time': start_time,
-            'end_time': end_time,
+            'startTime': startTime,
+            'endTime': endTime,
             'page_no': 0,
             'page_size': 100,
             "warehouse_no": 3,
             "specNo": specNo,
         }
-        params = get_params(data)
+        params = getParams(data)
         response = requests.post(url, params=params, data=data).json()
         response = response.get('stocks')
         if response:
@@ -818,38 +828,38 @@ class WangDianTong(object):
             return 0
     
     @classmethod
-    def onceModifyWangOrderShipColor(cls):
+    def onceModifyWangDianTongOrderShipColor(cls):
         """修改旺店通订单旗帜颜色"""
         now = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
         content = now + '千牛系统自动识别库存'
         logger.info(content.center(100, '='))
         logger.info('开始千牛系统登录....')
-        order_login()
+        orderLogin()
         logger.info('开始获取白色旗帜订单....')
-        orders = get_order('imgextra/i2')
+        orderCodes = getOrderCodes('白色')
         logger.info(f'所有订单：{orders}')
-        if not orders:
+        if not orderCodes:
             logger.info('暂无订单可处理')
             return True
-        for order in orders:
-            order_info = get_order_detail(order, prodcut_many=True)
-            logger.info(f'\n{order}订单：{[i["title"] for i in order_info]}')
-            for order_ in order_info:
-                products = order_['product']
-                for product in products:
-                    size = order_['size']
-                    color = order_['color']
-                    shop_code = get_shop_code(product, size, color)
-                    stock = get_stock(shop_code) if shop_code else 0
-                    order_['stock'] = stock
-                    logger.info(f'{order_["title"]}  {product} 库存：{order_["stock"]}')
+        for orderCode in orderCodes:
+            orderInfo = getOrderDetail(orderCode, isWrite=True)
+            logger.info(f'\n{order}订单：{[i["productTitle"] for i in orderInfo]}')
+            for subOrder in orderInfo:
+                productCodes = subOrder['productCodes']
+                size = subOrder['size']
+                color = subOrder['color']
+                for productCode in productCodes:
+                    shopCode = cls.getShopCode(product, size, color)
+                    stock = getStock(shopCode) if shopCode else 0
+                    subOrder['stock'] = stock
                     if stock:
                         break
+                logger.info(f'{subOrder["fullTitle"]} 库存：{subOrder["stock"]}')
             stocks = [i['stock'] for i in order_info]
             stocks = list(set(stocks))
             if stocks == [0]:
                 logger.info(f'{order}订单所有商品均无库存，修改为紫色旗帜')
-                chang_status(order)
+                modifyOrderStatus(orderCode)
                 logger.info(f'{order}订单成功修改为紫色旗帜')
             else:
                 logger.info(f'{order}订单存在商品有库存，暂不处理')
@@ -859,22 +869,9 @@ class WangDianTong(object):
     @classmethod
     def modifyWangOrderShipColor(cls):
         for i in range(10000):
-            cls.onceModifyWangOrderShipColor()
+            cls.onceModifyWangDianTongOrderShipColor()
             logger.info(f'等待3分钟再次执行\n')
             time.sleep(3 * 60)
-
-def clearLoginInfo():
-    """清空当前登录信息"""
-    write_config_value('alibaba', {
-        'orderCookie': None,
-        'orderCookie_api': None,
-    })
-    write_config_value('uniqlo', {
-        'uniqloToken': None,
-        'uniqloCookie': None,
-        'uniqloCookieApi': None,
-    })
-    logger.info('已清空当前登录信息')
 
 if __name__ == '__main__':
     step = input("请选择执行步骤（1.运行机械臂下单、2.查询优衣库订单信息、3.修改旺店通订单旗帜颜色、4.清空当前登录信息）：")
@@ -885,7 +882,7 @@ if __name__ == '__main__':
     elif step == '3':
         WangDianTong.modifyWangOrderShipColor()
     elif step == '4':
-        clearLoginInfo()
+        clear()
     else:
         logger.error('请输入正确的步骤')
 
