@@ -556,7 +556,7 @@ def deleteSpecialProduct(uniqloOrderCode, productCode='486121'):
     Playwright_.click('//button[text()="提交申请"]')
 
 
-def executeSingleOrder(orderCode, isWrite=True):
+def executeSingleOrder(orderCode, resultMany, isWrite=True):
     """单次单个订单"""
     orderInfo = getOrderDetail(orderCode, isWrite=isWrite)
     logger.info(f'开始处理{orderCode}订单：{[i["productTitle"] for i in orderInfo]}')
@@ -642,7 +642,7 @@ def onceRunRobot(controller, deviceIp, resultMany, isShip):
     logger.info('获取千牛每个订单详情....')
     for orderCode in orderCodes:
         # 执行单个订单
-        successSubOrder = executeSingleOrder(orderCode, isWrite=True)
+        successSubOrder = executeSingleOrder(orderCode, resultMany, isWrite=True)
 
         if not successSubOrder:
             logger.info(f'{orderCode}无匹配订单数据，跳过该订单')
