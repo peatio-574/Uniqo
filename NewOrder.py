@@ -14,16 +14,16 @@ from PlayWright import Playwright_, get_config_value, write_config_value, logger
 
 eleInfo = {
     '返回': [0.08304, 0.06057],
-    '0': [0.08304, 0.06057],
-    '1': [0.08304, 0.06057],
-    '2': [0.08304, 0.06057],
-    '3': [0.08304, 0.06057],
-    '4': [0.08304, 0.06057],
-    '5': [0.08304, 0.06057],
-    '6': [0.08304, 0.06057],
-    '7': [0.08304, 0.06057],
-    '8': [0.08304, 0.06057],
-    '9': [0.08304, 0.06057]
+    '0': [0.49786, 0.94586],
+    '1': [0.18026, 0.73347],
+    '2': [0.50434, 0.73149],
+    '3': [0.81977, 0.73943],
+    '4': [0.17378, 0.80493],
+    '5': [0.51082, 0.79997],
+    '6': [0.82193, 0.80493],
+    '7': [0.18026, 0.86746],
+    '8': [0.51082, 0.87440],
+    '9': [0.83490, 0.87143]
 }
 
 configFile = os.path.join(os.path.dirname(__file__), 'config.ini')
@@ -118,7 +118,7 @@ def getOrderCodes(flag='紫色'):
         for rowId in range(1, rowCount+1):
             orderCodeEle = f'({rowEle})[{rowId}]//div[contains(text()[1], "订单号")]'  # 订单号
             orderCode = Playwright_.get_text(orderCodeEle)
-            orderCode = re.findall('\d+', orderCode)[0]  # 订单号
+            orderCode = re.findall(r'\d+', orderCode)[0]  # 订单号
 
             orderColorEle = f'({rowEle})[{rowId}]//img[contains(@class,"sold_new")]'  # 旗帜颜色
             colorSrc = Playwright_.get_attribute(orderColorEle, 'src')
@@ -127,7 +127,7 @@ def getOrderCodes(flag='紫色'):
 
             orderDateEle = '//span[contains(@class,"sold_create-time")]'  # 订单日期
             orderDate = Playwright_.get_text(orderDateEle)
-            orderDate = re.findall('\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}', orderDate)[0]
+            orderDate = re.findall(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}', orderDate)[0]
             orders[orderCode] = orderDate
 
         if pages == 1 or page == pages:
@@ -208,7 +208,7 @@ def getOrderDetail(orderCode, isWrite=False):
             continue
 
         # 商品编号
-        ProductCodes = re.findall('\d{6}', productTitle)
+        ProductCodes = re.findall(r'\d{6}', productTitle)
         ProductCodes = list(set(ProductCodes))
         if not ProductCodes:
             logger.info(f"{orderCode} {productTitle}   商品编号异常，暂不计入订单：{productTitle}")
@@ -420,7 +420,7 @@ def dealAddrStr(addrStr):
     address = ''.join([char if char.isalnum() or '\u4e00' <= char <= '\u9fa5' else '' for char in address])
     address = address if '86-' in add_str[1] else address + ' 电话转' + add_str[1].split('-')[1]
     # 电话
-    mobilenumber = re.findall('1[3-9]\d{9}', add_str[1])[0]
+    mobilenumber = re.findall(r'1[3-9]\d{9}', add_str[1])[0]
     # 姓名
     consignee = add_str[0]
     # 省份
