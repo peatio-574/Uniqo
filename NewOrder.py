@@ -138,6 +138,19 @@ def getOrderCodes(flag='紫色'):
     orders = sorted(orders.items(), key=lambda x: x[1])  # 根据日期排序
     return [i[0] for i in orders]
 
+def displayOrderInfo():
+    """将千牛订单信息从隐藏状态改为显示状态"""
+    addrEle = '//span[@class="receive-address_value__Fmomy"]'
+    addr = Playwright_.get_text(addrEle)
+    for roll in range(3):
+        if '*****' not in addr:
+            break
+        logger.info('订单信息已隐藏，尝试点击展开获取订单信息')
+        Playwright_.click('//div[@role="switch"]/div[2]')
+        time.sleep(2)
+        addr = Playwright_.get_text(addrEle)
+    return addr
+
 def getOrderDetail(orderCode, isWrite=False):
     """
     获取指定订单的订单详情
@@ -148,42 +161,16 @@ def getOrderDetail(orderCode, isWrite=False):
     url = f'https://qn.taobao.com/home.htm/trade-platform/tp/detail?spm=a21dvs.23580594.0.0.60fb645eXEF8jc&bizOrderId={orderCode}'
     Playwright_.goto(url)
     time.sleep(3)
-    # 敏感信息是否自动展示
-    displayEle = '//div[@role="switch" and @aria-checked="false"]/div[2]'
-    if Playwright_.get_count(displayEle):
-        Playwright_.click(displayEle)
-    time.sleep(2)
-
-    addrEle = '//span[@class="receive-address_value__Fmomy"]'
-    addr = Playwright_.get_text(addrEle)
-    logger.info(f'{orderCode}订单地址：{addr}')
 
     orderInfo = []
 
-    if '*****' in addr:
-        logger.info('订单信息已隐藏，尝试再次获取订单信息')
-        Playwright_.click('//div[@role="switch"]/div[2]')
-        time.sleep(2)
-        displayEle = '//div[@role="switch" and @aria-checked="false"]/div[2]'
-        if Playwright_.get_count(displayEle):
-            Playwright_.click(displayEle)
-        time.sleep(2)
-        addr = Playwright_.get_text(addrEle)
-        logger.info(f'{orderCode}订单地址：{addr}')
-
-    if '*****' in addr:
-        logger.info('订单信息已隐藏，尝试再次获取订单信息')
-        Playwright_.click('//div[@role="switch"]/div[2]')
-        time.sleep(2)
-        displayEle = '//div[@role="switch" and @aria-checked="false"]/div[2]'
-        if Playwright_.get_count(displayEle):
-            Playwright_.click(displayEle)
-        time.sleep(2)
-        addr = Playwright_.get_text(addrEle)
-        logger.info(f'{orderCode}订单地址：{addr}')
+    addr = displayOrderInfo()
     if '*****' in addr:
         logger.info(f'订单信息仍为隐藏状态，跳过该订单：{orderCode}：{addr}')
         return orderInfo
+
+    logger.info(f'{orderCode}订单地址：{addr}')
+
     subOrderEle = '//tr[@class="order-item"]'
     subOrderCount = Playwright_.get_count(subOrderEle)
 
@@ -614,7 +601,7 @@ def main(controller, deviceIp, resultMany, isShip):
             quantity = subOrder['quantity']
             color = subOrder['color']
             colorCode = subOrder['colorCode']
-            addr = subOrder['quantity']
+            addr = subOrder['addr']
             productCodes = subOrder['productCodes']
             if len(productCodes) > 1:
                 logger.info(f'{fullTitle}\t\t存在多个{productCodes}')
@@ -725,6 +712,7 @@ def pay(controller, device_ip, server='127.0.0.1', rotation=3):
     logger.info('点击完成')
     controller.ocr_text_and_click(server, device_ip, rotation, '完成', home=False)
     return True
+
 
 if __name__ == '__main__':
     isShip = input("请选择是否包邮（1是、0否）：")
