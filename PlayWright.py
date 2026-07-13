@@ -4,7 +4,7 @@ import sys
 import os
 from pathlib import Path
 
-# 把项目根目录 D:\robot 加入Python路径
+# 把项目根目录 加入Python路径
 sys.path.append(str(Path(__file__).parent.parent))
 
 from Config import get_config_value, write_config_value
