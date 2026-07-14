@@ -440,6 +440,7 @@ def addAddr(addrStr):
     Playwright_.page.locator('//input[@name="address"]').fill(address)
     Playwright_.page.locator('//input[@name="mobilenumber"]').fill(mobilenumber)
     Playwright_.click('//button[@type="submit"]')
+    Playwright_.click('//button[text()="确认"]')
     time.sleep(random.randint(2, 4))
     validAddrEle = '//label[text()="收货地址："]/../span'
     validAddrCount = Playwright_.get_count(validAddrEle)
