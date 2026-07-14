@@ -11,6 +11,8 @@ import re
 from lgb import ESP32Controller
 import os
 from PlayWright import Playwright_, get_config_value, write_config_value, logger
+import pandas
+from openpyxl.styles import Font
 
 eleInfo = {
     '返回': [0.08304, 0.06057],
@@ -156,7 +158,7 @@ def getOrderDetail(orderCode, isWrite=False):
     """
     获取指定订单的订单详情
     isWrite是否进行订单信息写入
-    返回：[{'title': '', 'product': '', 'color_id': '', 'color': '', 'size': '', 'quantity': '', 'addr': ''}, {}]
+    返回：[{'title': '', 'product': '', 'colorCode': '', 'color': '', 'size': '', 'quantity': '', 'addr': ''}, {}]
     """
     addOrderCookie()
     url = f'https://qn.taobao.com/home.htm/trade-platform/tp/detail?spm=a21dvs.23580594.0.0.60fb645eXEF8jc&bizOrderId={orderCode}'
@@ -745,9 +747,149 @@ def runRobot():
         keepTime = uniqloWalk() + uniqloWalk() + uniqloWalk()
         time.sleep(interval - keepTime)
 
-def queryUniqloOrder():
-    """查询优衣库订单信息"""
-    pass
+class Uniqlo(object):
+    infos = {}
+
+    @classmethod
+    def getPageInfo(cls, page=1):
+        """获取每页数据"，返回总数和当页数据"""
+        url = f'https://i.uniqlo.cn/p/hmall-od-service/order/queryForUserOrders/{page}/10/zh_CN'
+        logger.info(f'查询第{page}页订单数据')
+        response = requests.post(url, headers=uniqloHeaders(), json={}).json()
+        logger.info(response)
+        return response['total'], response['resp']
+
+    @classmethod
+    def dealPageInfo(cls, pageInfo):
+        """处理每页数据"""
+        for orderInfo in pageInfo:  # 每条订单
+            for subOrder in orderInfo['details']:  # 订单的每条数据
+                status = subOrder['status']
+                if status in ['CANCELLED', 'CLOSED']:  # 无效订单
+                    continue
+                # good_no = order['summaryInfo']['code']
+                color = subOrder['productDetailInfo']['styleText'].replace(' ', '')
+                goodsNo = re.findall(r'\d{6}', color)[0] if re.findall(r'\d{6}', color) else subOrder['summaryInfo'][
+                    'code']
+                color = re.findall(r'\d+[\u4e00-\u9fff]+', color)[0] if '色' in color else color
+                size = subOrder['productDetailInfo']['sizeText']
+                price = '价格：' + subOrder['productDetailInfo']['price']
+
+                if size == 'XXL':
+                    size = '2XL'
+                elif size == 'XXXL':
+                    size = '3XL'
+                elif size == 'XXXXL':
+                    size = '4XL'
+
+                if not cls.infos.get(goodsNo):
+                    cls.infos[goodsNo] = dict()
+                if not cls.infos.get(good_no).get(color):
+                    cls.infos[goodsNo][color] = dict()
+                if not cls.infos.get(good_no).get(color).get(size):
+                    cls.infos[goodsNo][color][size] = {}
+
+                if not cls.infos.get(good_no).get(color).get(size).get(price):
+                    cls.infos[goodsNo][color][size][price] = subOrder['quantity']
+                else:
+                    cls.infos[goodsNo][color][size][price] += subOrder['quantity']
+        return True
+
+    @classmethod
+    def getPagesInfo(cls):
+        """获取所有页订单数据"""
+        uniqloLogin()
+        total, pageInfo = cls.getPageInfo(1)
+        cls.dealPageInfo(pageInfo)
+        pages = total // 10 if total % 10 == 0 else total // 10 + 1
+        for page in range(2, pages + 1):
+            pageInfo = cls.getPageInfo(page)[1]
+            cls.dealPageInfo(pageInfo)
+            
+    @classmethod
+    def xlsxAppend(cls, data, filename):
+        try:
+            pd = pandas.DataFrame(data)
+            with pandas.ExcelWriter(filename, engine='openpyxl', mode='a', if_sheet_exists='overlay') as writer:
+                workbook = writer.book
+                sheet = workbook.active
+                startRow = sheet.max_row
+                pd.to_excel(writer, sheet_name='Sheet1', startrow=startRow, index=False, header=True)
+                cols = pd.shape[1]  # 列数
+                for col in range(1, cols + 1):
+                    sheet.cell(row=startRow + 1, column=col).font = Font(bold=True)
+            logger.info('数据写入成功')
+            return True
+        except Exception as e:
+            logger.error('数据写入失败：%s' % e)
+            return False
+
+    @classmethod
+    def queryUniqloOrder(cls):
+        """查询优衣库订单信息"""
+        date = time.strftime('%Y-%m-%d %H:%M:%S')
+        filename = os.path.join(os.path.dirname(__file__), '优衣库订单统计表.xlsx')
+
+        logger.info('开始获取优衣库订单数据.....')
+        cls.getPagesInfo()
+        time.sleep(2)
+        phone = getPhone()
+
+        while True:
+            text = input('请输入查询货号（附带查询价格时请用逗号隔开，如：482295 99）：')
+            if text == '1':
+                exit()
+            text = text.split(' ')
+            goodsNo = text[0]
+            currentInfo = cls.infos.get(goodsNo)
+            if currentInfo is None:
+                logger.info(f'当前货号：{goodsNo}暂无数据')
+                continue
+            if len(text) == 1:
+                currentInfo = {k: {a: sum(list(b.values())) for a, b in v.items()} for k, v in currentInfo.items()}
+            elif len(text) == 2:
+                currentInfo = {k: {a: b[f'价格：{text[1]}'] for a, b in v.items() if f'价格：{text[1]}' in b.keys()} for
+                                k, v in currentInfo.items()}
+
+            if not currentInfo:
+                logger.info(f'{goodsNo}货号暂无数据！！！')
+                continue
+
+            logger.info(f'{goodsNo}货号数据为：{currentInfo}')
+
+            allSize = list()  # 当前商品的全部尺寸
+            for v in currentInfo.values():
+                for key in v.keys():
+                    if key not in allSize:
+                        allSize.append(key)
+
+            tmpSize = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL']
+            isSize = False
+            for i in allSize:
+                if i in tmpSize:
+                    isSize = True
+                    break
+            allSize = sorted(allSize) if not isSize else tmpSize
+
+            columKeys = ['优衣库账号', '日期', '货号', '色号'] + allSize
+            endText = f'查询价格：' + text[1] if len(text) == 2 else f'查询价格：'
+            columKeys.append(endText)
+            data = {i: list() for i in columKeys}
+
+            for currentColor, current in currentInfo.items():
+                data['优衣库账号'].append(phone)
+                data['日期'].append(date)
+                data['货号'].append(goodsNo)
+                data['色号'].append(currentColor)
+
+                valid_size = list(current.keys())
+                for size in allSize:
+                    if size not in valid_size:
+                        data[size].append(0)
+                    else:
+                        data[size].append(current[size])
+                data[endText].append(None)
+            cls.xlsxAppend(data, filename)
 
 class WangDianTong(object):
     """旺店通"""
@@ -841,12 +983,12 @@ class WangDianTong(object):
         orderLogin()
         logger.info('开始获取白色旗帜订单....')
         orderCodes = getOrderCodes('白色')
-        logger.info(f'所有订单：{orders}')
+        logger.info(f'所有订单：{orderCodes}')
         if not orderCodes:
             logger.info('暂无订单可处理')
             return True
         for orderCode in orderCodes:
-            orderInfo = getOrderDetail(orderCode, isWrite=True)
+            orderInfo = getOrderDetail(orderCode, isWrite=False)
             logger.info(f'\n{order}订单：{[i["productTitle"] for i in orderInfo]}')
             for subOrder in orderInfo:
                 productCodes = subOrder['productCodes']
@@ -862,13 +1004,12 @@ class WangDianTong(object):
             stocks = [i['stock'] for i in order_info]
             stocks = list(set(stocks))
             if stocks == [0]:
-                logger.info(f'{order}订单所有商品均无库存，修改为紫色旗帜')
+                logger.info(f'{orderCode}订单所有商品均无库存，修改为紫色旗帜')
                 modifyOrderStatus(orderCode)
                 logger.info(f'{order}订单成功修改为紫色旗帜')
             else:
                 logger.info(f'{order}订单存在商品有库存，暂不处理')
         return True
-        pass
 
     @classmethod
     def modifyWangOrderShipColor(cls):
@@ -882,7 +1023,7 @@ if __name__ == '__main__':
     if step == '1':
         runRobot()
     elif step == '2':
-        queryUniqloOrder()
+        Uniqlo.queryUniqloOrder()
     elif step == '3':
         WangDianTong.modifyWangOrderShipColor()
     elif step == '4':
