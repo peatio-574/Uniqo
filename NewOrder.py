@@ -555,7 +555,6 @@ def deleteSpecialProduct(uniqloOrderCode, productCode='486121'):
     Playwright_.input('//textarea', '拍错了')
     Playwright_.click('//button[text()="提交申请"]')
 
-
 def executeSingleOrder(orderCode, resultMany, isWrite=True):
     """单次单个订单"""
     orderInfo = getOrderDetail(orderCode, isWrite=isWrite)
@@ -615,7 +614,6 @@ def executeSingleOrder(orderCode, resultMany, isWrite=True):
                 break
     return successSubOrder
 
-
 def onceRunRobot(controller, deviceIp, resultMany, isShip):
     """start首次运行为False，后续为True"""
     now = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
@@ -649,6 +647,7 @@ def onceRunRobot(controller, deviceIp, resultMany, isShip):
             continue
 
         # 添加地址
+        addr = successSubOrder[0]['addr']
         logger.info(f'开始添加快递地址：{addr}')
         isAddAddr = addAddr(addr)
 
