@@ -445,7 +445,7 @@ def addAddr(addrStr):
     validAddrEle = '//label[text()="收货地址："]/../span'
     validAddrCount = Playwright_.get_count(validAddrEle)
     validAddr = [Playwright_.get_text(f'({validAddrEle})[{i}]') for i in range(1, validAddrCount+1)]
-    return True if address in validAddr else False
+    return True if address[:15] in str(validAddr) else False
 
 def getPurchaseList():
     """获取购物车列表"""
