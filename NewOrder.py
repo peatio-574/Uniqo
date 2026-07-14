@@ -529,9 +529,9 @@ def modifyOrderStatus(orderCode, text=None):
 def clear():
     """清除cookie"""
     logger.info('开始清除千牛登录信息')
-    write_config_value('alibaba', {'orderCookie': ''}, file=config_file)
+    write_config_value('alibaba', {'orderCookie': ''}, file=configFile)
     logger.info('开始清除优衣库登录信息')
-    write_config_value('uniqlo', {'uniqloCookie': '', 'uniqloCookieApi': '', 'uniqloToken': ''}, file=config_file)
+    write_config_value('uniqlo', {'uniqloCookie': '', 'uniqloCookieApi': '', 'uniqloToken': ''}, file=configFile)
     logger.info('清除登录信息成功')
 
 def uniqloSubmit():
