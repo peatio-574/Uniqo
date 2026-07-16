@@ -84,7 +84,7 @@ def addOrderCookie():
 
 def addUniqloCookie():
     """页面添加优衣库cookie"""
-    uniqloCookie = get_config_value('uniqo', 'uniqloCookie', file=configFile)
+    uniqloCookie = get_config_value('uniqlo', 'uniqloCookie', file=configFile)
     if uniqloCookie:
         Playwright_.add_cookie(eval(uniqloCookie))
 
@@ -480,8 +480,10 @@ def addToPurchase(uniqloCode, uniqloSizeCode, quantity):
             "checkFlag": "Y"
         }
     ]
-    requests.post(url, headers=uniqloHeaders(), data=json.dumps(params)).json()
-    return True
+    response = requests.post(url, headers=uniqloHeaders(flag=True), data=json.dumps(params)).json()
+    if response.get('success') != True:
+        logger.error(f'{uniqloCode}-{uniqloSizeCode}加入购物车失败：{response}')
+    return response['success']
 
 def getPhone():
     """获取优衣库手机号"""
@@ -1031,5 +1033,4 @@ if __name__ == '__main__':
         clear()
     else:
         logger.error('请输入正确的步骤')
-
 
