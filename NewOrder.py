@@ -539,6 +539,7 @@ def clear():
 
 def uniqloSubmit():
     """优衣库提交订单"""
+    uniqloLogin()
     Playwright_.goto('https://www.uniqlo.cn/cart.html')
     time.sleep(3)
     Playwright_.click('//button[text()="立即结算"]')
