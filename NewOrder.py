@@ -726,6 +726,7 @@ def pay(controller, device_ip, server='127.0.0.1', rotation=3):
     password = str(get_config_value('login', 'password'))
     for word in password:
         controller.move_click(device_ip=device_ip, x_ratio=eleInfo[word][0], y_ratio=eleInfo[word][1], home=True)
+        time.sleep(2)
 
     write_config_value('login', {'date': time.strftime("%m-%d %H:%M", time.localtime())})
 
